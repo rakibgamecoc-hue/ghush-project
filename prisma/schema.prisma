@@ -1,0 +1,32 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model BribeReport {
+  id                 String   @id @default(uuid())
+  departmentCategory String   // e.g., "JPJ", "PDRM", "Imigresen", "Kastam"
+  serviceType        String   // e.g., "Road Tax", "Passport Renewal"
+  stateRegion        String   // e.g., "Selangor", "Kuala Lumpur", "Johor"
+  districtLocation   String   // e.g., "Petaling Jaya", "Shah Alam"
+  amountDemanded     Decimal  @db.Decimal(10,2) // Monetary value in MYR (Ringgit) — use Decimal for exact currency
+  outcome            Outcome  // PAID, REJECTED, PENDING
+  narrativeText      String   // Sanitized text (PII & names redacted)
+  verificationStatus String   @default("Unverified") 
+  createdAt          DateTime @default(now())
+
+  @@index([stateRegion])
+  @@index([departmentCategory])
+  @@index([outcome])
+  @@index([createdAt])
+  @@index([amountDemanded])
+}
+
+enum Outcome {
+  PAID
+  REJECTED
+  PENDING
+}
