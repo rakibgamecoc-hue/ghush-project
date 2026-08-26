@@ -7,7 +7,7 @@ export function FaqSection() {
     <section className="max-w-3xl mx-auto space-y-6 pt-10">
       <h2 className="text-2xl font-black text-center">Soalan Lazim (FAQ)</h2>
       
-      <Accordion type="single" collapsible className="w-full">
+      <Accordion className="w-full">
         <AccordionItem value="item-1">
           <AccordionTrigger className="font-bold text-left">Adakah identiti saya selamat?</AccordionTrigger>
           <AccordionContent className="text-slate-600 leading-relaxed">

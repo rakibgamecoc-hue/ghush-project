@@ -1,9 +1,14 @@
 import { Accordion as AccordionPrimitive } from "@base-ui/react/accordion"
+import type { ComponentPropsWithoutRef } from "react"
 
 import { cn } from "@/lib/utils"
 import { ChevronDownIcon, ChevronUpIcon } from "lucide-react"
 
-function Accordion({ className, ...props }: AccordionPrimitive.Root.Props) {
+type AccordionRootProps = ComponentPropsWithoutRef<typeof AccordionPrimitive.Root> & {
+  className?: string
+}
+
+function Accordion({ className, ...props }: AccordionRootProps) {
   return (
     <AccordionPrimitive.Root
       data-slot="accordion"
