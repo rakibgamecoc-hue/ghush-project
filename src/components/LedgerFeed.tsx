@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { ThumbsDown, ThumbsUp } from "lucide-react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -40,6 +40,7 @@ export function LedgerFeed({ locale = "ms" }: LedgerFeedProps) {
   const [sort, setSort] = useState("latest");
   const [selectionMap, setSelectionMap] = useState<Record<string, VoteChoice | null>>({});
   const [voteStatsMap, setVoteStatsMap] = useState<Record<string, VoteStats>>({});
+  const queryClient = useQueryClient();
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -126,6 +127,13 @@ export function LedgerFeed({ locale = "ms" }: LedgerFeedProps) {
       const json = await res.json();
       if (json.voteStats) {
         setVoteStatsMap((prev) => ({ ...prev, [reportId]: json.voteStats }));
+      }
+
+      // Ensure the main reports query is refreshed so other fields (and other clients) reflect the updated counts
+      try {
+        queryClient.invalidateQueries(["reports"]);
+      } catch (e) {
+        // ignore query client errors in environments where React Query isn't configured
       }
     } catch (error) {
       console.error("Failed to store vote:", error);
