@@ -1,49 +1,55 @@
+"use client";
+
+import { useState } from "react";
 import { ReportModal } from "@/components/ReportModal";
 import { DashboardMetrics } from "@/components/DashboardMetrics";
 import { LedgerFeed } from "@/components/LedgerFeed";
 import { FaqSection } from "@/components/FaqSection";
+import { SiteHeader } from "@/components/SiteHeader";
+import { translations, type SupportedLanguage } from "@/lib/translations";
 
 export default function Home() {
+  const [language, setLanguage] = useState<SupportedLanguage>("ms");
+  const t = translations[language];
+
   return (
-    <main className="max-w-6xl mx-auto px-4 py-12 space-y-16">
-      {/* Hero Section */}
-      <section className="text-center space-y-6 max-w-3xl mx-auto pt-10">
-        <h1 className="text-5xl font-black tracking-tight text-slate-900 leading-tight">
-          Seseorang minta wang tambahan...<br />
-          <span className="text-yellow-600 bg-yellow-100 px-2 rounded-sm inline-block mt-2">
-            catatkan di buku lejar.
-          </span>
-        </h1>
-        <p className="text-lg text-slate-600">
-          Name the department. Name the demand. Keep the person private. 
-          A zero-knowledge, crowdsourced ledger to track public service corruption in Malaysia.
-        </p>
-        <div className="flex items-center justify-center gap-4 pt-4">
-          <ReportModal />
-          <a href="#ledger" className="text-sm font-medium hover:underline text-slate-700">
-            Lihat Lejar Langsung
-          </a>
+    <>
+      <SiteHeader language={language} setLanguage={setLanguage} />
+      <main id="top" className="mx-auto max-w-6xl px-4 py-12 space-y-16">
+        <section className="mx-auto max-w-3xl space-y-6 pt-10 text-center">
+          <h1 className="text-5xl font-black leading-tight tracking-tight text-slate-900">
+            {t.hero.headline}
+            <br />
+            <span className="mt-2 inline-block rounded-sm bg-yellow-100 px-2 text-yellow-700">
+              {t.hero.accent}
+            </span>
+          </h1>
+          <p className="text-lg text-slate-600">{t.hero.subtitle}</p>
+          <div className="flex items-center justify-center gap-4 pt-4">
+            <ReportModal locale={language} />
+            <a href="#ledger" className="text-sm font-medium text-slate-700 hover:underline">
+              {t.hero.secondary}
+            </a>
+          </div>
+        </section>
+
+        <div id="metrics">
+          <DashboardMetrics locale={language} />
         </div>
-      </section>
 
-      {/* Metrics */}
-      <DashboardMetrics />
+        <div id="ledger">
+          <LedgerFeed locale={language} />
+        </div>
 
-      {/* Ledger Feed */}
-      <div id="ledger">
-        <LedgerFeed />
-      </div>
+        <div id="faq">
+          <FaqSection locale={language} />
+        </div>
 
-      {/* FAQ */}
-      <FaqSection />
-
-      {/* Footer / Disclaimer */}
-      <footer className="pt-16 pb-8 text-center text-sm text-slate-500 border-t border-slate-200 mt-16">
-        <p className="font-semibold mb-2">Legal Disclaimer</p>
-        <p className="max-w-2xl mx-auto">
-          This platform is an unverified public awareness ledger and does not constitute formal legal complaints or evidence for statutory anti-corruption authorities. No IP addresses or personally identifiable information are logged.
-        </p>
-      </footer>
-    </main>
+        <footer className="mt-16 border-t border-slate-200 pb-8 pt-16 text-center text-sm text-slate-500">
+          <p className="mb-2 font-semibold">{t.footer.legalDisclaimer}</p>
+          <p className="mx-auto max-w-2xl">{t.footer.disclaimerBody}</p>
+        </footer>
+      </main>
+    </>
   );
 }
