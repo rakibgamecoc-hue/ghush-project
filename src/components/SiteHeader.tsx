@@ -28,21 +28,22 @@ export function SiteHeader({ language, setLanguage }: SiteHeaderProps) {
   const currentLanguage = LANGUAGE_OPTIONS.find((option) => option.value === language) ?? LANGUAGE_OPTIONS[0];
   const anyMenuOpen = isMenuOpen || isLanguageMenuOpen || isQuickJumpOpen;
 
+  const closeAllMenus = () => {
+    setIsMenuOpen(false);
+    setIsLanguageMenuOpen(false);
+    setIsQuickJumpOpen(false);
+  };
+
   useEffect(() => {
     const onPointerDown = (event: MouseEvent) => {
       const target = event.target as Node;
       if (!navRef.current || navRef.current.contains(target)) return;
-
-      setIsMenuOpen(false);
-      setIsLanguageMenuOpen(false);
-      setIsQuickJumpOpen(false);
+      closeAllMenus();
     };
 
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
-        setIsMenuOpen(false);
-        setIsLanguageMenuOpen(false);
-        setIsQuickJumpOpen(false);
+        closeAllMenus();
       }
     };
 
@@ -51,24 +52,37 @@ export function SiteHeader({ language, setLanguage }: SiteHeaderProps) {
       const shouldShow = currentY < 24 || currentY < lastScrollY.current;
       setIsHeaderVisible(shouldShow);
       lastScrollY.current = currentY;
+
+      if (anyMenuOpen) {
+        closeAllMenus();
+      }
     };
 
     document.addEventListener("mousedown", onPointerDown);
     document.addEventListener("keydown", onKeyDown);
     window.addEventListener("scroll", onScroll, { passive: true });
+    window.addEventListener("wheel", onScroll, { passive: true });
+    window.addEventListener("touchmove", onScroll, { passive: true });
+
+    if (anyMenuOpen) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "";
+    }
 
     return () => {
       document.removeEventListener("mousedown", onPointerDown);
       document.removeEventListener("keydown", onKeyDown);
       window.removeEventListener("scroll", onScroll);
+      window.removeEventListener("wheel", onScroll);
+      window.removeEventListener("touchmove", onScroll);
+      document.body.style.overflow = "";
     };
-  }, []);
+  }, [anyMenuOpen]);
 
   const handleJump = (href: string) => {
     document.querySelector(href)?.scrollIntoView({ behavior: "smooth", block: "start" });
-    setIsMenuOpen(false);
-    setIsQuickJumpOpen(false);
-    setIsLanguageMenuOpen(false);
+    closeAllMenus();
   };
 
   const showLanguageMenu = () => {
@@ -84,7 +98,7 @@ export function SiteHeader({ language, setLanguage }: SiteHeaderProps) {
 
   return (
     <>
-      {anyMenuOpen && <div className="fixed inset-0 z-40 bg-slate-950/15 backdrop-blur-[2px] md:hidden" onClick={() => { setIsMenuOpen(false); setIsLanguageMenuOpen(false); setIsQuickJumpOpen(false); }} />}
+      {anyMenuOpen && <div className="fixed inset-0 z-40 bg-slate-950/70 backdrop-blur-sm md:hidden" onClick={closeAllMenus} />}
 
       <header className={`sticky top-0 z-50 w-full py-4 transition-all duration-300 ease-out ${isHeaderVisible ? "translate-y-0 opacity-100" : "-translate-y-5 opacity-0 pointer-events-none"}`}>
         <div className="mx-auto max-w-6xl px-4" ref={navRef}>
@@ -189,7 +203,7 @@ export function SiteHeader({ language, setLanguage }: SiteHeaderProps) {
             </div>
 
             {isMenuOpen && (
-              <div className="menu-pop-in space-y-3 border-t-2 border-slate-900 bg-white/90 p-4 md:hidden">
+              <div className="menu-pop-in relative z-[60] space-y-3 border-t-2 border-slate-900 bg-white/90 p-4 md:hidden">
                 <div className="flex flex-col gap-2">
                   {NAV_ITEMS.map((item) => (
                     <button

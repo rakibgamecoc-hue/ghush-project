@@ -10,6 +10,7 @@ import { translations, type SupportedLanguage } from "@/lib/translations";
 
 export default function Home() {
   const [language, setLanguage] = useState<SupportedLanguage>("ms");
+  const [showTerms, setShowTerms] = useState(false);
   const t = translations[language];
 
   return (
@@ -48,6 +49,18 @@ export default function Home() {
         <footer className="mt-16 border-t border-slate-200 pb-8 pt-16 text-center text-sm text-slate-500">
           <p className="mb-2 font-semibold">{t.footer.legalDisclaimer}</p>
           <p className="mx-auto max-w-2xl">{t.footer.disclaimerBody}</p>
+          <div className="mt-6 flex flex-wrap items-center justify-center gap-3 text-[10px] uppercase tracking-[0.16em] text-slate-400">
+            <a href="mailto:rakibhassan215095@gmail.com" className="transition hover:text-slate-700">Contact developer</a>
+            <span>•</span>
+            <button type="button" onClick={() => setShowTerms((current) => !current)} className="transition hover:text-slate-700">
+              {showTerms ? "Hide terms" : "Terms & Conditions"}
+            </button>
+          </div>
+          {showTerms && (
+            <div id="terms" className="mt-6 max-w-2xl text-left text-[10px] leading-relaxed text-slate-400">
+              By using this platform, you agree that all submissions are public awareness records and not formal legal complaints. You must not post personally identifiable information, defamatory content, or false claims. The operator is not responsible for misuse, inaccuracies, or third-party actions arising from submitted reports.
+            </div>
+          )}
         </footer>
       </main>
     </>
