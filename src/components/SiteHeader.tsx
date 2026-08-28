@@ -20,10 +20,13 @@ export function SiteHeader({ language, setLanguage }: SiteHeaderProps) {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isLanguageMenuOpen, setIsLanguageMenuOpen] = useState(false);
   const [isQuickJumpOpen, setIsQuickJumpOpen] = useState(false);
+  const [isHeaderVisible, setIsHeaderVisible] = useState(true);
   const navRef = useRef<HTMLDivElement | null>(null);
+  const lastScrollY = useRef(0);
 
   const t = translations[language];
   const currentLanguage = LANGUAGE_OPTIONS.find((option) => option.value === language) ?? LANGUAGE_OPTIONS[0];
+  const anyMenuOpen = isMenuOpen || isLanguageMenuOpen || isQuickJumpOpen;
 
   useEffect(() => {
     const onPointerDown = (event: MouseEvent) => {
@@ -43,12 +46,21 @@ export function SiteHeader({ language, setLanguage }: SiteHeaderProps) {
       }
     };
 
+    const onScroll = () => {
+      const currentY = window.scrollY;
+      const shouldShow = currentY < 24 || currentY < lastScrollY.current;
+      setIsHeaderVisible(shouldShow);
+      lastScrollY.current = currentY;
+    };
+
     document.addEventListener("mousedown", onPointerDown);
     document.addEventListener("keydown", onKeyDown);
+    window.addEventListener("scroll", onScroll, { passive: true });
 
     return () => {
       document.removeEventListener("mousedown", onPointerDown);
       document.removeEventListener("keydown", onKeyDown);
+      window.removeEventListener("scroll", onScroll);
     };
   }, []);
 
@@ -56,11 +68,13 @@ export function SiteHeader({ language, setLanguage }: SiteHeaderProps) {
     document.querySelector(href)?.scrollIntoView({ behavior: "smooth", block: "start" });
     setIsMenuOpen(false);
     setIsQuickJumpOpen(false);
+    setIsLanguageMenuOpen(false);
   };
 
   const showLanguageMenu = () => {
     setIsLanguageMenuOpen((open) => !open);
     setIsQuickJumpOpen(false);
+    setIsMenuOpen(false);
   };
 
   const showQuickJump = () => {
@@ -69,144 +83,151 @@ export function SiteHeader({ language, setLanguage }: SiteHeaderProps) {
   };
 
   return (
-    <header className="sticky top-0 z-50 w-full py-4">
-      <div className="mx-auto max-w-6xl px-4" ref={navRef}>
-        <div className="rounded-full border-2 border-slate-900 bg-white/90 shadow-[0_6px_0_rgba(15,23,42,0.9)] backdrop-blur-sm">
-          <div className="flex items-center justify-between gap-4 px-4 py-3">
-            <button
-              type="button"
-              onClick={() => handleJump("#top")}
-              className="flex items-center gap-3 rounded-full focus:outline-none focus:ring-2 focus:ring-yellow-500"
-              aria-label="Go to top"
-            >
-              <span className="flex h-9 w-9 items-center justify-center rounded-full border-2 border-slate-900 bg-yellow-400 text-sm font-black text-slate-900">
-                R
-              </span>
-              <span className="text-sm font-black uppercase tracking-[0.2em] text-slate-900">Rasuah</span>
-            </button>
+    <>
+      {anyMenuOpen && <div className="fixed inset-0 z-40 bg-slate-950/15 backdrop-blur-[2px] md:hidden" onClick={() => { setIsMenuOpen(false); setIsLanguageMenuOpen(false); setIsQuickJumpOpen(false); }} />}
 
-            <nav className="hidden items-center gap-1 md:flex" aria-label="Main navigation">
-              {NAV_ITEMS.map((item) => (
-                <button
-                  key={item.key}
-                  type="button"
-                  onClick={() => handleJump(item.href)}
-                  className="rounded-full px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100 hover:text-slate-900"
-                >
-                  {t.nav[item.key as keyof typeof t.nav]}
-                </button>
-              ))}
-            </nav>
+      <header className={`sticky top-0 z-50 w-full py-4 transition-all duration-300 ease-out ${isHeaderVisible ? "translate-y-0 opacity-100" : "-translate-y-5 opacity-0 pointer-events-none"}`}>
+        <div className="mx-auto max-w-6xl px-4" ref={navRef}>
+          <div className="rounded-full border-2 border-slate-900 bg-white/90 shadow-[0_6px_0_rgba(15,23,42,0.9)] backdrop-blur-sm">
+            <div className="flex items-center justify-between gap-4 px-4 py-3">
+              <button
+                type="button"
+                onClick={() => handleJump("#top")}
+                className="flex items-center gap-3 rounded-full focus:outline-none focus:ring-2 focus:ring-yellow-500"
+                aria-label="Go to top"
+              >
+                <span className="flex h-9 w-9 items-center justify-center rounded-full border-2 border-slate-900 bg-yellow-400 text-sm font-black text-slate-900">
+                  R
+                </span>
+                <span className="flex flex-col items-start leading-none">
+                  <span className="text-sm font-black uppercase tracking-[0.2em] text-slate-900">Rasuah</span>
+                  <span className="mt-1 text-[8px] font-bold uppercase tracking-[0.2em] text-slate-500">Bribe reporting platform</span>
+                </span>
+              </button>
 
-            <div className="hidden items-center gap-2 md:flex">
-              <div className="relative">
-                <button
-                  type="button"
-                  onClick={showQuickJump}
-                  className="inline-flex items-center gap-2 rounded-full border-2 border-slate-900 bg-slate-100 px-3 py-2 text-sm font-semibold text-slate-900 transition hover:bg-slate-200"
-                  aria-label={t.nav.quickJump}
-                >
-                  <span>{t.nav.quickJump}</span>
-                  <ChevronDown className="h-4 w-4" />
-                </button>
-                {isQuickJumpOpen && (
-                  <div className="menu-pop-in absolute right-0 mt-2 flex min-w-44 origin-top-right flex-col rounded-2xl border-2 border-slate-900 bg-white p-2 shadow-[6px_6px_0_rgba(15,23,42,0.9)]">
-                    {NAV_ITEMS.map((item) => (
-                      <button
-                        key={item.key}
-                        type="button"
-                        onClick={() => handleJump(item.href)}
-                        className="rounded-xl px-3 py-2 text-left text-sm font-medium text-slate-700 transition hover:bg-slate-100 hover:text-slate-900"
-                      >
-                        {t.nav[item.key as keyof typeof t.nav]}
-                      </button>
-                    ))}
-                  </div>
-                )}
+              <nav className="hidden items-center gap-1 md:flex" aria-label="Main navigation">
+                {NAV_ITEMS.map((item) => (
+                  <button
+                    key={item.key}
+                    type="button"
+                    onClick={() => handleJump(item.href)}
+                    className="rounded-full px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100 hover:text-slate-900"
+                  >
+                    {t.nav[item.key as keyof typeof t.nav]}
+                  </button>
+                ))}
+              </nav>
+
+              <div className="hidden items-center gap-2 md:flex">
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={showQuickJump}
+                    className="inline-flex items-center gap-2 rounded-full border-2 border-slate-900 bg-slate-100 px-3 py-2 text-sm font-semibold text-slate-900 transition hover:bg-slate-200"
+                    aria-label={t.nav.quickJump}
+                  >
+                    <span>{t.nav.quickJump}</span>
+                    <ChevronDown className="h-4 w-4" />
+                  </button>
+                  {isQuickJumpOpen && (
+                    <div className="menu-pop-in absolute right-0 mt-2 flex min-w-44 origin-top-right flex-col rounded-2xl border-2 border-slate-900 bg-white p-2 shadow-[6px_6px_0_rgba(15,23,42,0.9)]">
+                      {NAV_ITEMS.map((item) => (
+                        <button
+                          key={item.key}
+                          type="button"
+                          onClick={() => handleJump(item.href)}
+                          className="rounded-xl px-3 py-2 text-left text-sm font-medium text-slate-700 transition hover:bg-slate-100 hover:text-slate-900"
+                        >
+                          {t.nav[item.key as keyof typeof t.nav]}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={showLanguageMenu}
+                    className="inline-flex items-center gap-2 rounded-full border-2 border-slate-900 bg-yellow-400 px-3 py-2 text-sm font-bold text-slate-900 transition hover:bg-yellow-300"
+                    aria-label={t.nav.language}
+                  >
+                    <Globe className="h-4 w-4" />
+                    <span>{currentLanguage.short}</span>
+                    <ChevronDown className="h-4 w-4" />
+                  </button>
+                  {isLanguageMenuOpen && (
+                    <div className="menu-pop-in absolute right-0 mt-2 flex min-w-40 origin-top-right flex-col rounded-2xl border-2 border-slate-900 bg-white p-2 shadow-[6px_6px_0_rgba(15,23,42,0.9)]">
+                      {LANGUAGE_OPTIONS.map((option) => (
+                        <button
+                          key={option.value}
+                          type="button"
+                          onClick={() => {
+                            setLanguage(option.value);
+                            setIsLanguageMenuOpen(false);
+                          }}
+                          className={`rounded-xl px-3 py-2 text-left text-sm font-medium transition-all duration-200 ${
+                            language === option.value ? "bg-yellow-100 text-slate-900" : "text-slate-700 hover:bg-slate-100"
+                          }`}
+                        >
+                          {option.label}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
 
-              <div className="relative">
-                <button
-                  type="button"
-                  onClick={showLanguageMenu}
-                  className="inline-flex items-center gap-2 rounded-full border-2 border-slate-900 bg-yellow-400 px-3 py-2 text-sm font-bold text-slate-900 transition hover:bg-yellow-300"
-                  aria-label={t.nav.language}
-                >
-                  <Globe className="h-4 w-4" />
-                  <span>{currentLanguage.short}</span>
-                  <ChevronDown className="h-4 w-4" />
-                </button>
-                {isLanguageMenuOpen && (
-                  <div className="menu-pop-in absolute right-0 mt-2 flex min-w-40 origin-top-right flex-col rounded-2xl border-2 border-slate-900 bg-white p-2 shadow-[6px_6px_0_rgba(15,23,42,0.9)]">
+              <button
+                type="button"
+                onClick={() => setIsMenuOpen((open) => !open)}
+                className="inline-flex h-11 w-11 items-center justify-center rounded-full border-2 border-slate-900 bg-slate-100 text-slate-900 md:hidden"
+                aria-label="Open mobile menu"
+              >
+                {isMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+              </button>
+            </div>
+
+            {isMenuOpen && (
+              <div className="menu-pop-in space-y-3 border-t-2 border-slate-900 bg-white/90 p-4 md:hidden">
+                <div className="flex flex-col gap-2">
+                  {NAV_ITEMS.map((item) => (
+                    <button
+                      key={item.key}
+                      type="button"
+                      onClick={() => handleJump(item.href)}
+                      className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-left text-sm font-semibold text-slate-700 transition-all duration-200 hover:bg-slate-100"
+                    >
+                      {t.nav[item.key as keyof typeof t.nav]}
+                    </button>
+                  ))}
+                </div>
+
+                <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 shadow-[0_4px_0_rgba(15,23,42,0.08)]">
+                  <p className="mb-2 text-xs font-bold uppercase tracking-[0.2em] text-slate-500">{t.nav.language}</p>
+                  <div className="grid grid-cols-2 gap-2">
                     {LANGUAGE_OPTIONS.map((option) => (
                       <button
                         key={option.value}
                         type="button"
                         onClick={() => {
                           setLanguage(option.value);
-                          setIsLanguageMenuOpen(false);
+                          setIsMenuOpen(false);
                         }}
                         className={`rounded-xl px-3 py-2 text-left text-sm font-medium transition-all duration-200 ${
-                          language === option.value ? "bg-yellow-100 text-slate-900" : "text-slate-700 hover:bg-slate-100"
+                          language === option.value ? "bg-yellow-100 text-slate-900 ring-2 ring-yellow-300" : "bg-white text-slate-700 hover:bg-slate-100"
                         }`}
                       >
                         {option.label}
                       </button>
                     ))}
                   </div>
-                )}
-              </div>
-            </div>
-
-            <button
-              type="button"
-              onClick={() => setIsMenuOpen((open) => !open)}
-              className="inline-flex h-11 w-11 items-center justify-center rounded-full border-2 border-slate-900 bg-slate-100 text-slate-900 md:hidden"
-              aria-label="Open mobile menu"
-            >
-              {isMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
-            </button>
-          </div>
-
-          {isMenuOpen && (
-            <div className="menu-pop-in space-y-3 border-t-2 border-slate-900 p-4 md:hidden">
-              <div className="flex flex-col gap-2">
-                {NAV_ITEMS.map((item) => (
-                  <button
-                    key={item.key}
-                    type="button"
-                    onClick={() => handleJump(item.href)}
-                    className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-left text-sm font-semibold text-slate-700 transition-all duration-200 hover:bg-slate-100"
-                  >
-                    {t.nav[item.key as keyof typeof t.nav]}
-                  </button>
-                ))}
-              </div>
- 
-              <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 shadow-[0_4px_0_rgba(15,23,42,0.08)]">
-                <p className="mb-2 text-xs font-bold uppercase tracking-[0.2em] text-slate-500">{t.nav.language}</p>
-                <div className="grid grid-cols-2 gap-2">
-                  {LANGUAGE_OPTIONS.map((option) => (
-                    <button
-                      key={option.value}
-                      type="button"
-                      onClick={() => {
-                        setLanguage(option.value);
-                        setIsMenuOpen(false);
-                      }}
-                      className={`rounded-xl px-3 py-2 text-left text-sm font-medium transition-all duration-200 ${
-                        language === option.value ? "bg-yellow-100 text-slate-900 ring-2 ring-yellow-300" : "bg-white text-slate-700 hover:bg-slate-100"
-                      }`}
-                    >
-                      {option.label}
-                    </button>
-                  ))}
                 </div>
               </div>
-            </div>
-          )}
+            )}
+          </div>
         </div>
-      </div>
-    </header>
+      </header>
+    </>
   );
 }

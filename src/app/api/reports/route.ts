@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { sanitizeSubmission } from "@/lib/moderation";
 import validateEnv from "@/lib/env";
+import { getVoteStats } from "@/lib/vote-store";
 
 // Validate environment on module load
 validateEnv();
@@ -89,6 +90,7 @@ export async function GET(req: Request) {
       return {
         ...r,
         amountDemanded: maybeAmt ? parseFloat(maybeAmt.toString()) : maybeAmt,
+        voteStats: getVoteStats(r.id),
       };
     });
 
