@@ -12,6 +12,30 @@ import { translations } from "@/lib/translations";
 export default function Home() {
   const [language, setLanguage] = useLanguagePreference();
   const [showTerms, setShowTerms] = useState(false);
+
+  // Persist language preference in localStorage so reloads keep the user's choice
+  // Key mirrors other storage keys in the codebase
+  useEffect(() => {
+    try {
+      const saved = typeof window !== "undefined" ? window.localStorage.getItem("rasuah-language-v1") : null;
+      if (saved && (saved as SupportedLanguage)) {
+        setLanguage(saved as SupportedLanguage);
+      }
+    } catch {
+      // ignore localStorage errors
+    }
+  }, []);
+
+  useEffect(() => {
+    try {
+      if (typeof window !== "undefined") {
+        window.localStorage.setItem("rasuah-language-v1", language);
+      }
+    } catch {
+      // ignore localStorage errors
+    }
+  }, [language]);
+
   const t = translations[language];
 
   return (
