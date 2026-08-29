@@ -1,13 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ReportModal } from "@/components/ReportModal";
 import { DashboardMetrics } from "@/components/DashboardMetrics";
 import { LedgerFeed } from "@/components/LedgerFeed";
 import { FaqSection } from "@/components/FaqSection";
 import { SiteHeader } from "@/components/SiteHeader";
 import { useLanguagePreference } from "@/lib/language-preference";
-import { translations } from "@/lib/translations";
+import { translations, type SupportedLanguage } from "@/lib/translations";
 
 export default function Home() {
   const [language, setLanguage] = useLanguagePreference();

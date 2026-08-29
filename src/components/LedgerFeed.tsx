@@ -134,7 +134,7 @@ export function LedgerFeed({ locale = "ms" }: LedgerFeedProps) {
 
       // Ensure the main reports query is refreshed so other fields (and other clients) reflect the updated counts
       try {
-        queryClient.invalidateQueries(["reports"]);
+        queryClient.invalidateQueries({ queryKey: ["reports"] });
       } catch (e) {
         // ignore query client errors in environments where React Query isn't configured
       }
