@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { LANGUAGE_OPTIONS, type SupportedLanguage } from "@/lib/translations";
 
-const STORAGE_KEY = "rasuah-language";
+const STORAGE_KEY = "rasuah-language-v1";
 
 export function getStoredLanguage(): SupportedLanguage | null {
   if (typeof window === "undefined") return null;
@@ -29,10 +29,15 @@ export function storeLanguage(language: SupportedLanguage): void {
 }
 
 export function useLanguagePreference(defaultLanguage: SupportedLanguage = "ms") {
-  const [language, setLanguageState] = useState<SupportedLanguage>(() => {
+  // Always start with the provided default language so server-render and
+  // initial client render match. Read stored preference in an effect to
+  // avoid hydration mismatches.
+  const [language, setLanguageState] = useState<SupportedLanguage>(defaultLanguage);
+
+  useEffect(() => {
     const stored = getStoredLanguage();
-    return stored || defaultLanguage;
-  });
+    if (stored) setLanguageState(stored);
+  }, []);
 
   useEffect(() => {
     document.documentElement.lang = language;

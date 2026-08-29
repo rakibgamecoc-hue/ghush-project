@@ -4,6 +4,7 @@ import { applyVote, getVoteStats, type VoteChoice } from "@/lib/vote-store";
 export async function POST(req: Request) {
   try {
     const body = await req.json();
+    console.log("/api/reports/vote POST body:", body);
     const { reportId, choice, previousChoice } = body as {
       reportId?: string;
       choice?: VoteChoice;
@@ -15,6 +16,7 @@ export async function POST(req: Request) {
     }
 
     const voteStats = applyVote(reportId, choice, previousChoice ?? null);
+    console.log("/api/reports/vote updated stats:", voteStats);
 
     return NextResponse.json({
       success: true,

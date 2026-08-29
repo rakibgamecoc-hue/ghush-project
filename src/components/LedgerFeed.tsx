@@ -106,6 +106,7 @@ export function LedgerFeed({ locale = "ms" }: LedgerFeedProps) {
 
   const handleVote = async (reportId: string, choice: VoteChoice) => {
     const previousChoice = selectionMap[reportId] ?? null;
+    console.log("LedgerFeed: handleVote", { reportId, choice, previousChoice });
     if (previousChoice === choice) return;
 
     const nextStats = { ...(voteStatsMap[reportId] ?? { agree: 0, disagree: 0 }) };
@@ -128,6 +129,7 @@ export function LedgerFeed({ locale = "ms" }: LedgerFeedProps) {
       }
 
       const json = await res.json();
+      console.log("LedgerFeed: vote response", json);
       if (json.voteStats) {
         setVoteStatsMap((prev) => ({ ...prev, [reportId]: json.voteStats }));
       }
