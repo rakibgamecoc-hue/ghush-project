@@ -71,7 +71,7 @@ Vote counts are stored on each report in PostgreSQL. The ledger updates immediat
 
 **Production migrations**
 
-On a push to `main`, GitHub Actions runs `npx prisma migrate deploy` after the build checks when the `POSTGRES_URL_NON_POOLING` production secret is configured. Vercel production builds also run the migration before `next build`; preview builds do not. Configure Vercel's production environment with a direct PostgreSQL URL and never commit database URLs to `.env` or source control.
+On a push to `main`, GitHub Actions runs `npx prisma migrate deploy` after the build checks when the `POSTGRES_URL_NON_POOLING` production secret is configured. Vercel production builds also record the original production schema as a Prisma baseline, then run later migrations before `next build`; preview builds do not. Configure Vercel's production environment with a direct PostgreSQL URL and never commit database URLs to `.env` or source control.
 
 **Development notes**
 - Language preference uses `src/lib/language-preference.ts` and is persisted to `localStorage` under the key `rasuah-language-v1`.

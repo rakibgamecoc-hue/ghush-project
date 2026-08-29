@@ -39,4 +39,6 @@ jobs:
       - name: Install
         run: npm ci
       - name: Apply migrations
-        run: npx prisma migrate deploy
+        run: |
+          npx prisma migrate resolve --applied 20260828000000_baseline || true
+          npx prisma migrate deploy
