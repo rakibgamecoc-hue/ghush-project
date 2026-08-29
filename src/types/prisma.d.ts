@@ -11,6 +11,8 @@ declare module "@prisma/client" {
     outcome: string;
     narrativeText: string;
     verificationStatus?: string;
+    agreeVotes: number;
+    disagreeVotes: number;
     createdAt: string | Date;
   };
 
@@ -18,6 +20,8 @@ declare module "@prisma/client" {
     constructor(...args: any[]);
     bribeReport: {
       create: (...args: any[]) => Promise<any>;
+      findUnique: (...args: any[]) => Promise<any>;
+      update: (...args: any[]) => Promise<any>;
       findMany: (...args: any[]) => Promise<any[]>;
       aggregate: (...args: any[]) => Promise<any>;
       count: (...args: any[]) => Promise<number>;

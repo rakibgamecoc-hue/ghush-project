@@ -29,7 +29,7 @@ This repository implements a server-rendered Next.js app with a small Prisma-bac
 npm install
 ```
 
-2. (Optional) Configure your database for Prisma by setting `DATABASE_URL` in your environment. If you plan to use the built-in Prisma models, run migrations:
+2. (Optional) Configure your database for Prisma by setting `POSTGRES_URL_NON_POOLING` (preferred), `DATABASE_URL`, or `POSTGRES_URL`. If you plan to use the built-in Prisma models, run migrations:
 
 ```bash
 npx prisma migrate dev --name init
@@ -67,7 +67,11 @@ Notes:
 - `GET /api/reports/vote?reportId=...` — fetch vote stats for a specific report.
 
 **Voting behavior**
-Votes are stored in an in-memory Map via `src/lib/vote-store.ts` for demo purposes. This means votes are ephemeral and will reset when the server restarts. To persist votes, wire the vote logic to your database and update the API routes accordingly.
+Vote counts are stored on each report in PostgreSQL. The ledger updates immediately in the browser, queues the write briefly to avoid excess requests, and retains pending votes locally until they can be sent.
+
+**Production migrations**
+
+On a push to `main`, GitHub Actions runs `npx prisma migrate deploy` after the build checks when the `POSTGRES_URL_NON_POOLING` production secret is configured. Vercel production builds also run the migration before `next build`; preview builds do not. Configure Vercel's production environment with a direct PostgreSQL URL and never commit database URLs to `.env` or source control.
 
 **Development notes**
 - Language preference uses `src/lib/language-preference.ts` and is persisted to `localStorage` under the key `rasuah-language-v1`.
@@ -84,4 +88,3 @@ Votes are stored in an in-memory Map via `src/lib/vote-store.ts` for demo purpos
 
 **Contact**
 For questions or to report issues, contact the maintainer: rakibhassan215095@gmail.com
-

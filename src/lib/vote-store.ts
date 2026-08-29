@@ -1,40 +1,42 @@
 export type VoteChoice = "agree" | "disagree";
 
+import prisma from "@/lib/prisma";
+import type { PrismaClient } from "@prisma/client";
+
 export type VoteStats = {
   agree: number;
   disagree: number;
 };
 
-declare global {
-  var __rasuahVoteStore: Map<string, VoteStats> | undefined;
+export async function getVoteStats(reportId: string): Promise<VoteStats> {
+  const report = await prisma.bribeReport.findUnique({
+    where: { id: reportId },
+    select: { agreeVotes: true, disagreeVotes: true },
+  });
+
+  return report
+    ? { agree: report.agreeVotes, disagree: report.disagreeVotes }
+    : { agree: 0, disagree: 0 };
 }
 
-const voteStore = globalThis.__rasuahVoteStore ?? new Map<string, VoteStats>();
+export async function applyVote(reportId: string, choice: VoteChoice, previousChoice?: VoteChoice | null): Promise<VoteStats> {
+  const report = await prisma.$transaction(async (tx: PrismaClient) => {
+    const current = await tx.bribeReport.findUnique({
+      where: { id: reportId },
+      select: { agreeVotes: true, disagreeVotes: true },
+    });
 
-if (!globalThis.__rasuahVoteStore) {
-  globalThis.__rasuahVoteStore = voteStore;
-}
+    if (!current) {
+      throw new Error("Report not found");
+    }
 
-export function getVoteStats(reportId: string): VoteStats {
-  return voteStore.get(reportId) ?? { agree: 0, disagree: 0 };
-}
+    const next = {
+      agreeVotes: Math.max(0, current.agreeVotes - (previousChoice === "agree" ? 1 : 0) + (choice === "agree" && previousChoice !== choice ? 1 : 0)),
+      disagreeVotes: Math.max(0, current.disagreeVotes - (previousChoice === "disagree" ? 1 : 0) + (choice === "disagree" && previousChoice !== choice ? 1 : 0)),
+    };
 
-export function applyVote(reportId: string, choice: VoteChoice, previousChoice?: VoteChoice | null) {
-  const current = getVoteStats(reportId);
-  const next = { ...current };
+    return tx.bribeReport.update({ where: { id: reportId }, data: next });
+  });
 
-  if (previousChoice === "agree") {
-    next.agree = Math.max(0, next.agree - 1);
-  }
-
-  if (previousChoice === "disagree") {
-    next.disagree = Math.max(0, next.disagree - 1);
-  }
-
-  if (!previousChoice || previousChoice !== choice) {
-    next[choice] += 1;
-  }
-
-  voteStore.set(reportId, next);
-  return next;
+  return { agree: report.agreeVotes, disagree: report.disagreeVotes };
 }

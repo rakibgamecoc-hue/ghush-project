@@ -16,6 +16,8 @@ model BribeReport {
   outcome            Outcome  // PAID, REJECTED, PENDING
   narrativeText      String   // Sanitized text (PII & names redacted)
   verificationStatus String   @default("Unverified") 
+  agreeVotes         Int      @default(0)
+  disagreeVotes      Int      @default(0)
   createdAt          DateTime @default(now())
 
   @@index([stateRegion])

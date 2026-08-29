@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { ThumbsDown, ThumbsUp } from "lucide-react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -34,56 +34,112 @@ type LedgerFeedProps = {
 };
 
 const STORAGE_KEY = "rasuah-vote-selection-v1";
+const VOTE_STATE_KEY = "rasuah-vote-state-v2";
+const VOTE_DEBOUNCE_MS = 750;
 
-const loadStoredSelections = (): Record<string, VoteChoice | null> => {
-  if (typeof window === "undefined") return {};
+type StoredVoteState = {
+  selections: Record<string, VoteChoice | null>;
+  stats: Record<string, VoteStats>;
+  pending: Record<string, PendingVote>;
+};
+
+type PendingVote = {
+  choice: VoteChoice;
+  previousChoice: VoteChoice | null;
+};
+
+const loadStoredVoteState = (): StoredVoteState => {
   try {
-    const saved = window.localStorage.getItem(STORAGE_KEY);
-    return saved ? JSON.parse(saved) : {};
+    const saved = window.localStorage.getItem(VOTE_STATE_KEY);
+    if (saved) {
+      const parsed = JSON.parse(saved) as Partial<StoredVoteState>;
+      return {
+        selections: parsed.selections ?? {},
+        stats: parsed.stats ?? {},
+        pending: Object.fromEntries(
+          Object.entries(parsed.pending ?? {}).map(([reportId, pending]) => [
+            reportId,
+            typeof pending === "string"
+              ? { choice: pending as VoteChoice, previousChoice: null }
+              : pending as PendingVote,
+          ]),
+        ),
+      };
+    }
+
+    // Preserve selections made before this durable vote-state format existed.
+    const legacySelections = window.localStorage.getItem(STORAGE_KEY);
+    return { selections: legacySelections ? JSON.parse(legacySelections) : {}, stats: {}, pending: {} };
   } catch {
-    return {};
+    return { selections: {}, stats: {}, pending: {} };
   }
 };
 
 export function LedgerFeed({ locale = "ms" }: LedgerFeedProps) {
   const [filter, setFilter] = useState("ALL");
   const [sort, setSort] = useState("latest");
-  const [selectionMap, setSelectionMap] = useState<Record<string, VoteChoice | null>>(loadStoredSelections);
+  const [selectionMap, setSelectionMap] = useState<Record<string, VoteChoice | null>>({});
   const [voteStatsMap, setVoteStatsMap] = useState<Record<string, VoteStats>>({});
+  const [pendingVotes, setPendingVotes] = useState<Record<string, PendingVote>>({});
   const queryClient = useQueryClient();
+  const selectionMapRef = useRef<Record<string, VoteChoice | null>>({});
+  const voteStatsMapRef = useRef<Record<string, VoteStats>>({});
+  const serverSelectionRef = useRef<Record<string, VoteChoice | null>>({});
+  const voteTimersRef = useRef<Map<string, number>>(new Map());
+  const hasLoadedStoredStateRef = useRef(false);
 
   useEffect(() => {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(selectionMap));
-  }, [selectionMap]);
+    const stored = loadStoredVoteState();
+    selectionMapRef.current = stored.selections;
+    serverSelectionRef.current = { ...stored.selections };
+    Object.entries(stored.pending).forEach(([reportId, pending]) => {
+      serverSelectionRef.current[reportId] = pending.previousChoice;
+    });
+    voteStatsMapRef.current = stored.stats;
+    const timer = window.setTimeout(() => {
+      setSelectionMap(stored.selections);
+      setVoteStatsMap(stored.stats);
+      setPendingVotes(stored.pending);
+      hasLoadedStoredStateRef.current = true;
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, []);
+
+  useEffect(() => {
+    if (!hasLoadedStoredStateRef.current) return;
+    window.localStorage.setItem(VOTE_STATE_KEY, JSON.stringify({ selections: selectionMap, stats: voteStatsMap, pending: pendingVotes }));
+  }, [pendingVotes, selectionMap, voteStatsMap]);
 
   const { data, isLoading } = useQuery({
     queryKey: ["reports", filter, sort],
     queryFn: async () => {
       const res = await fetch(`/api/reports?outcome=${filter}&sort=${sort}`);
       if (!res.ok) {
-        return [];
+        throw new Error("Failed to load reports");
       }
 
       const json = await res.json();
       return json.reports || [];
     },
+    placeholderData: keepPreviousData,
   });
 
   useEffect(() => {
     if (!data || data.length === 0) return;
 
     // This is intentional - we need to update voteStatsMap when query data changes
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     setVoteStatsMap((current) => {
       const next = { ...current };
       let hasChanges = false;
       data.forEach((report: ApiReport) => {
         const newStats = report.voteStats ?? { agree: 0, disagree: 0 };
-        if (JSON.stringify(next[report.id]) !== JSON.stringify(newStats)) {
+        // A local optimistic value survives a slow or failed production refresh.
+        if (!next[report.id]) {
           next[report.id] = newStats;
           hasChanges = true;
         }
       });
+      voteStatsMapRef.current = hasChanges ? next : current;
       return hasChanges ? next : current;
     });
   }, [data]);
@@ -104,19 +160,8 @@ export function LedgerFeed({ locale = "ms" }: LedgerFeedProps) {
     PENDING: t.pending,
   };
 
-  const handleVote = async (reportId: string, choice: VoteChoice) => {
-    const previousChoice = selectionMap[reportId] ?? null;
-    console.log("LedgerFeed: handleVote", { reportId, choice, previousChoice });
-    if (previousChoice === choice) return;
-
-    const nextStats = { ...(voteStatsMap[reportId] ?? { agree: 0, disagree: 0 }) };
-    if (previousChoice === "agree") nextStats.agree = Math.max(0, nextStats.agree - 1);
-    if (previousChoice === "disagree") nextStats.disagree = Math.max(0, nextStats.disagree - 1);
-    nextStats[choice] += 1;
-
-    setSelectionMap((prev) => ({ ...prev, [reportId]: choice }));
-    setVoteStatsMap((prev) => ({ ...prev, [reportId]: nextStats }));
-
+  const sendVote = useCallback(async (reportId: string, choice: VoteChoice) => {
+    const previousChoice = serverSelectionRef.current[reportId] ?? null;
     try {
       const res = await fetch("/api/reports/vote", {
         method: "POST",
@@ -124,27 +169,70 @@ export function LedgerFeed({ locale = "ms" }: LedgerFeedProps) {
         body: JSON.stringify({ reportId, choice, previousChoice }),
       });
 
-      if (!res.ok) {
-        throw new Error("Vote request failed");
-      }
+      if (!res.ok) throw new Error("Vote request failed");
 
       const json = await res.json();
       console.log("LedgerFeed: vote response", json);
+      serverSelectionRef.current[reportId] = choice;
+      setPendingVotes((current) => {
+        const rest = { ...current };
+        delete rest[reportId];
+        return rest;
+      });
       if (json.voteStats) {
-        setVoteStatsMap((prev) => ({ ...prev, [reportId]: json.voteStats }));
+        const next = { ...voteStatsMapRef.current, [reportId]: json.voteStats as VoteStats };
+        voteStatsMapRef.current = next;
+        setVoteStatsMap(next);
       }
-
-      // Ensure the main reports query is refreshed so other fields (and other clients) reflect the updated counts
-      try {
-        queryClient.invalidateQueries({ queryKey: ["reports"] });
-      } catch (e) {
-        // ignore query client errors in environments where React Query isn't configured
-      }
+      void queryClient.invalidateQueries({ queryKey: ["reports"] });
     } catch (error) {
+      // Keep the local choice and count. It will retry on the user's next vote or page load.
       console.error("Failed to store vote:", error);
-      setSelectionMap((prev) => ({ ...prev, [reportId]: previousChoice }));
-      setVoteStatsMap((prev) => ({ ...prev, [reportId]: voteStatsMap[reportId] ?? { agree: 0, disagree: 0 } }));
     }
+  }, [queryClient]);
+
+  const queueVote = useCallback((reportId: string, vote: PendingVote) => {
+    const existingTimer = voteTimersRef.current.get(reportId);
+    if (existingTimer) window.clearTimeout(existingTimer);
+
+    const timer = window.setTimeout(() => {
+      voteTimersRef.current.delete(reportId);
+      void sendVote(reportId, vote.choice);
+    }, VOTE_DEBOUNCE_MS);
+    voteTimersRef.current.set(reportId, timer);
+  }, [sendVote]);
+
+  useEffect(() => {
+    if (!hasLoadedStoredStateRef.current) return;
+    Object.entries(pendingVotes).forEach(([reportId, vote]) => queueVote(reportId, vote));
+  }, [pendingVotes, queueVote]);
+
+  useEffect(() => () => {
+    voteTimersRef.current.forEach((timer) => window.clearTimeout(timer));
+  }, []);
+
+  const handleVote = (reportId: string, choice: VoteChoice) => {
+    const previousChoice = selectionMapRef.current[reportId] ?? null;
+    console.log("LedgerFeed: handleVote", { reportId, choice, previousChoice });
+    if (previousChoice === choice) return;
+
+    const nextStats = { ...(voteStatsMapRef.current[reportId] ?? { agree: 0, disagree: 0 }) };
+    if (previousChoice === "agree") nextStats.agree = Math.max(0, nextStats.agree - 1);
+    if (previousChoice === "disagree") nextStats.disagree = Math.max(0, nextStats.disagree - 1);
+    nextStats[choice] += 1;
+
+    const nextSelections = { ...selectionMapRef.current, [reportId]: choice };
+    const nextStatsMap = { ...voteStatsMapRef.current, [reportId]: nextStats };
+    selectionMapRef.current = nextSelections;
+    voteStatsMapRef.current = nextStatsMap;
+    setSelectionMap(nextSelections);
+    setVoteStatsMap(nextStatsMap);
+    const queuedVote = {
+      choice,
+      previousChoice: pendingVotes[reportId]?.previousChoice ?? serverSelectionRef.current[reportId] ?? null,
+    };
+    setPendingVotes((current) => ({ ...current, [reportId]: queuedVote }));
+    queueVote(reportId, queuedVote);
   };
 
   return (

@@ -15,7 +15,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Invalid vote payload" }, { status: 400 });
     }
 
-    const voteStats = applyVote(reportId, choice, previousChoice ?? null);
+    const voteStats = await applyVote(reportId, choice, previousChoice ?? null);
     console.log("/api/reports/vote updated stats:", voteStats);
 
     return NextResponse.json({
@@ -38,7 +38,7 @@ export async function GET(req: Request) {
       return NextResponse.json({ error: "Missing reportId" }, { status: 400 });
     }
 
-    return NextResponse.json({ voteStats: getVoteStats(reportId) });
+    return NextResponse.json({ voteStats: await getVoteStats(reportId) });
   } catch (error) {
     console.error("Failed to fetch vote stats:", error instanceof Error ? error.message : String(error));
     return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });

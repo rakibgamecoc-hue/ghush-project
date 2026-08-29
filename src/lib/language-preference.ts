@@ -29,13 +29,15 @@ export function storeLanguage(language: SupportedLanguage): void {
 }
 
 export function useLanguagePreference(defaultLanguage: SupportedLanguage = "ms") {
-  // Use a lazy initializer so the stored preference (if available) is
-  // read once during initial render. `getStoredLanguage` guards against
-  // server execution by returning `null` when `window` is undefined.
-  const [language, setLanguageState] = useState<SupportedLanguage>(() => {
+  // Render the same default on the server and first browser render.
+  const [language, setLanguageState] = useState<SupportedLanguage>(defaultLanguage);
+
+  useEffect(() => {
     const stored = getStoredLanguage();
-    return stored ?? defaultLanguage;
-  });
+    if (!stored) return;
+    const timer = window.setTimeout(() => setLanguageState(stored), 0);
+    return () => window.clearTimeout(timer);
+  }, []);
 
   useEffect(() => {
     document.documentElement.lang = language;
