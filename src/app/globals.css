@@ -140,8 +140,23 @@
   }
 }
 
+@keyframes menu-pop-out {
+  0% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-6px) scale(0.98);
+  }
+}
+
 @layer utilities {
   .menu-pop-in {
     animation: menu-pop 180ms ease-out;
+  }
+
+  .menu-pop-out {
+    animation: menu-pop-out 180ms ease-in forwards;
   }
 }

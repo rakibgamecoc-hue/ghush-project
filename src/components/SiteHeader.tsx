@@ -23,19 +23,35 @@ export function SiteHeader({ language, setLanguage }: SiteHeaderProps) {
   const [isHeaderVisible, setIsHeaderVisible] = useState(true);
   const navRef = useRef<HTMLDivElement | null>(null);
   const lastScrollY = useRef(0);
+  const isMenuOpenRef = useRef(isMenuOpen);
 
   const t = translations[language];
   const currentLanguage = LANGUAGE_OPTIONS.find((option) => option.value === language) ?? LANGUAGE_OPTIONS[0];
-  const anyMenuOpen = isMenuOpen || isLanguageMenuOpen || isQuickJumpOpen;
+  const anyDesktopMenuOpen = isLanguageMenuOpen || isQuickJumpOpen;
 
-  const closeAllMenus = () => {
+  isMenuOpenRef.current = isMenuOpen;
+
+  const closeMobileMenu = () => {
     setIsMenuOpen(false);
+  };
+
+  const closeDesktopMenus = () => {
     setIsLanguageMenuOpen(false);
     setIsQuickJumpOpen(false);
   };
 
+  const closeAllMenus = () => {
+    closeMobileMenu();
+    closeDesktopMenus();
+  };
+
+  const toggleMobileMenu = () => {
+    setIsMenuOpen((open) => !open);
+    closeDesktopMenus();
+  };
+
   useEffect(() => {
-    const onPointerDown = (event: MouseEvent) => {
+    const onPointerDown = (event: PointerEvent) => {
       const target = event.target as Node;
       if (!navRef.current || navRef.current.contains(target)) return;
       closeAllMenus();
@@ -47,38 +63,47 @@ export function SiteHeader({ language, setLanguage }: SiteHeaderProps) {
       }
     };
 
+    document.addEventListener("pointerdown", onPointerDown);
+    document.addEventListener("keydown", onKeyDown);
+
+    return () => {
+      document.removeEventListener("pointerdown", onPointerDown);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, []);
+
+  useEffect(() => {
     const onScroll = () => {
       const currentY = window.scrollY;
       const shouldShow = currentY < 24 || currentY < lastScrollY.current;
-      setIsHeaderVisible(shouldShow);
+      setIsHeaderVisible(shouldShow || isMenuOpenRef.current);
       lastScrollY.current = currentY;
 
-      if (anyMenuOpen) {
-        closeAllMenus();
+      if (anyDesktopMenuOpen) {
+        closeDesktopMenus();
       }
     };
 
-    document.addEventListener("mousedown", onPointerDown);
-    document.addEventListener("keydown", onKeyDown);
     window.addEventListener("scroll", onScroll, { passive: true });
-    window.addEventListener("wheel", onScroll, { passive: true });
-    window.addEventListener("touchmove", onScroll, { passive: true });
-
-    if (anyMenuOpen) {
-      document.body.style.overflow = "hidden";
-    } else {
-      document.body.style.overflow = "";
-    }
 
     return () => {
-      document.removeEventListener("mousedown", onPointerDown);
-      document.removeEventListener("keydown", onKeyDown);
       window.removeEventListener("scroll", onScroll);
-      window.removeEventListener("wheel", onScroll);
-      window.removeEventListener("touchmove", onScroll);
+    };
+  }, [anyDesktopMenuOpen]);
+
+  useEffect(() => {
+    if (!isMenuOpen) {
+      document.body.style.overflow = "";
+      return;
+    }
+
+    setIsHeaderVisible(true);
+    document.body.style.overflow = "hidden";
+
+    return () => {
       document.body.style.overflow = "";
     };
-  }, [anyMenuOpen]);
+  }, [isMenuOpen]);
 
   const handleJump = (href: string) => {
     document.querySelector(href)?.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -88,7 +113,7 @@ export function SiteHeader({ language, setLanguage }: SiteHeaderProps) {
   const showLanguageMenu = () => {
     setIsLanguageMenuOpen((open) => !open);
     setIsQuickJumpOpen(false);
-    setIsMenuOpen(false);
+    closeMobileMenu();
   };
 
   const showQuickJump = () => {
@@ -98,10 +123,20 @@ export function SiteHeader({ language, setLanguage }: SiteHeaderProps) {
 
   return (
     <>
-      {anyMenuOpen && <div className="fixed inset-0 z-40 bg-slate-950/70 backdrop-blur-sm md:hidden" onClick={closeAllMenus} />}
+      <div
+        aria-hidden={!isMenuOpen}
+        className={`fixed inset-0 z-40 bg-slate-950/70 backdrop-blur-sm transition-opacity duration-200 md:hidden ${
+          isMenuOpen ? "pointer-events-auto opacity-100" : "pointer-events-none opacity-0"
+        }`}
+        onClick={closeMobileMenu}
+      />
 
-      <header className={`sticky top-0 z-50 w-full py-4 transition-all duration-300 ease-out ${isHeaderVisible ? "translate-y-0 opacity-100" : "-translate-y-5 opacity-0 pointer-events-none"}`}>
-        <div className="mx-auto max-w-6xl px-4" ref={navRef}>
+      <header
+        className={`sticky top-0 z-50 w-full py-4 transition-[transform,opacity] duration-300 ease-out ${
+          isHeaderVisible ? "translate-y-0 opacity-100" : "-translate-y-5 opacity-0 pointer-events-none"
+        }`}
+      >
+        <div className="relative mx-auto max-w-6xl px-4" ref={navRef}>
           <div className="rounded-full border-2 border-slate-900 bg-white/90 shadow-[0_6px_0_rgba(15,23,42,0.9)] backdrop-blur-sm">
             <div className="flex items-center justify-between gap-4 px-4 py-3">
               <button
@@ -194,23 +229,37 @@ export function SiteHeader({ language, setLanguage }: SiteHeaderProps) {
 
               <button
                 type="button"
-                onClick={() => setIsMenuOpen((open) => !open)}
+                onClick={toggleMobileMenu}
                 className="inline-flex h-11 w-11 items-center justify-center rounded-full border-2 border-slate-900 bg-slate-100 text-slate-900 md:hidden"
-                aria-label="Open mobile menu"
+                aria-label={isMenuOpen ? "Close mobile menu" : "Open mobile menu"}
+                aria-expanded={isMenuOpen}
+                aria-controls="mobile-nav-panel"
               >
                 {isMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
               </button>
             </div>
+          </div>
 
-            {isMenuOpen && (
-              <div className="menu-pop-in relative z-[60] space-y-3 border-t-2 border-slate-900 bg-white/90 p-4 md:hidden">
+          <div
+            id="mobile-nav-panel"
+            aria-hidden={!isMenuOpen}
+            className={`grid transition-[grid-template-rows,opacity,margin] duration-200 ease-out md:hidden ${
+              isMenuOpen ? "mt-2 grid-rows-[1fr] opacity-100" : "pointer-events-none mt-0 grid-rows-[0fr] opacity-0"
+            }`}
+          >
+            <div className="overflow-hidden">
+              <div
+                className={`space-y-3 rounded-3xl border-2 border-slate-900 bg-white/95 p-4 shadow-[0_6px_0_rgba(15,23,42,0.9)] backdrop-blur-sm transition-[transform,opacity] duration-200 ease-out ${
+                  isMenuOpen ? "translate-y-0 scale-100" : "-translate-y-2 scale-[0.98]"
+                }`}
+              >
                 <div className="flex flex-col gap-2">
                   {NAV_ITEMS.map((item) => (
                     <button
                       key={item.key}
                       type="button"
                       onClick={() => handleJump(item.href)}
-                      className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-left text-sm font-semibold text-slate-700 transition-all duration-200 hover:bg-slate-100"
+                      className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-left text-sm font-semibold text-slate-700 transition-colors duration-200 hover:bg-slate-100"
                     >
                       {t.nav[item.key as keyof typeof t.nav]}
                     </button>
@@ -226,9 +275,9 @@ export function SiteHeader({ language, setLanguage }: SiteHeaderProps) {
                         type="button"
                         onClick={() => {
                           setLanguage(option.value);
-                          setIsMenuOpen(false);
+                          closeMobileMenu();
                         }}
-                        className={`rounded-xl px-3 py-2 text-left text-sm font-medium transition-all duration-200 ${
+                        className={`rounded-xl px-3 py-2 text-left text-sm font-medium transition-colors duration-200 ${
                           language === option.value ? "bg-yellow-100 text-slate-900 ring-2 ring-yellow-300" : "bg-white text-slate-700 hover:bg-slate-100"
                         }`}
                       >
@@ -238,7 +287,7 @@ export function SiteHeader({ language, setLanguage }: SiteHeaderProps) {
                   </div>
                 </div>
               </div>
-            )}
+            </div>
           </div>
         </div>
       </header>

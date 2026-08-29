@@ -6,10 +6,11 @@ import { DashboardMetrics } from "@/components/DashboardMetrics";
 import { LedgerFeed } from "@/components/LedgerFeed";
 import { FaqSection } from "@/components/FaqSection";
 import { SiteHeader } from "@/components/SiteHeader";
-import { translations, type SupportedLanguage } from "@/lib/translations";
+import { useLanguagePreference } from "@/lib/language-preference";
+import { translations } from "@/lib/translations";
 
 export default function Home() {
-  const [language, setLanguage] = useState<SupportedLanguage>("ms");
+  const [language, setLanguage] = useLanguagePreference();
   const [showTerms, setShowTerms] = useState(false);
   const t = translations[language];
 
