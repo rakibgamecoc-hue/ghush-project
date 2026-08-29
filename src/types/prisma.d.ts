@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 declare module "@prisma/client" {
   export type Decimal = any;
   export type BribeReport = {

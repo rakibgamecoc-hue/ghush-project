@@ -29,14 +29,10 @@ export function storeLanguage(language: SupportedLanguage): void {
 }
 
 export function useLanguagePreference(defaultLanguage: SupportedLanguage = "ms") {
-  const [language, setLanguageState] = useState<SupportedLanguage>(defaultLanguage);
-
-  useEffect(() => {
+  const [language, setLanguageState] = useState<SupportedLanguage>(() => {
     const stored = getStoredLanguage();
-    if (stored) {
-      setLanguageState(stored);
-    }
-  }, []);
+    return stored || defaultLanguage;
+  });
 
   useEffect(() => {
     document.documentElement.lang = language;

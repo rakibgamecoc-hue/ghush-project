@@ -3,6 +3,7 @@ import prisma from "@/lib/prisma";
 import { sanitizeSubmission } from "@/lib/moderation";
 import validateEnv from "@/lib/env";
 import { getVoteStats } from "@/lib/vote-store";
+import type { BribeReport } from "@prisma/client";
 
 // Validate environment on module load
 validateEnv();
@@ -70,7 +71,7 @@ export async function GET(req: Request) {
       orderByClause = { amountDemanded: "desc" };
     }
 
-    const reports: any[] = await prisma.bribeReport.findMany({
+    const reports: BribeReport[] = await prisma.bribeReport.findMany({
       where: whereClause,
       orderBy: orderByClause,
       take: 50, 

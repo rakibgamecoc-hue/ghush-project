@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { ChevronDown, Globe, Menu, X } from "lucide-react";
 import { LANGUAGE_OPTIONS, type SupportedLanguage, translations } from "@/lib/translations";
 
@@ -29,21 +29,24 @@ export function SiteHeader({ language, setLanguage }: SiteHeaderProps) {
   const currentLanguage = LANGUAGE_OPTIONS.find((option) => option.value === language) ?? LANGUAGE_OPTIONS[0];
   const anyDesktopMenuOpen = isLanguageMenuOpen || isQuickJumpOpen;
 
-  isMenuOpenRef.current = isMenuOpen;
-
-  const closeMobileMenu = () => {
+  const closeMobileMenu = useCallback(() => {
     setIsMenuOpen(false);
-  };
+  }, []);
 
-  const closeDesktopMenus = () => {
+  const closeDesktopMenus = useCallback(() => {
     setIsLanguageMenuOpen(false);
     setIsQuickJumpOpen(false);
-  };
+  }, []);
 
-  const closeAllMenus = () => {
+  const closeAllMenus = useCallback(() => {
     closeMobileMenu();
     closeDesktopMenus();
-  };
+  }, [closeMobileMenu, closeDesktopMenus]);
+
+  // Update ref after render
+  useEffect(() => {
+    isMenuOpenRef.current = isMenuOpen;
+  }, [isMenuOpen]);
 
   const toggleMobileMenu = () => {
     setIsMenuOpen((open) => !open);
@@ -70,13 +73,13 @@ export function SiteHeader({ language, setLanguage }: SiteHeaderProps) {
       document.removeEventListener("pointerdown", onPointerDown);
       document.removeEventListener("keydown", onKeyDown);
     };
-  }, []);
+  }, [closeAllMenus]);
 
   useEffect(() => {
     const onScroll = () => {
       const currentY = window.scrollY;
-      const shouldShow = currentY < 24 || currentY < lastScrollY.current;
-      setIsHeaderVisible(shouldShow || isMenuOpenRef.current);
+      const shouldShow = currentY < 24 || currentY < lastScrollY.current || isMenuOpen;
+      setIsHeaderVisible(shouldShow);
       lastScrollY.current = currentY;
 
       if (anyDesktopMenuOpen) {
@@ -89,16 +92,14 @@ export function SiteHeader({ language, setLanguage }: SiteHeaderProps) {
     return () => {
       window.removeEventListener("scroll", onScroll);
     };
-  }, [anyDesktopMenuOpen]);
+  }, [anyDesktopMenuOpen, closeDesktopMenus, isMenuOpen]);
 
   useEffect(() => {
-    if (!isMenuOpen) {
+    if (isMenuOpen) {
+      document.body.style.overflow = "hidden";
+    } else {
       document.body.style.overflow = "";
-      return;
     }
-
-    setIsHeaderVisible(true);
-    document.body.style.overflow = "hidden";
 
     return () => {
       document.body.style.overflow = "";

@@ -35,27 +35,23 @@ type LedgerFeedProps = {
 
 const STORAGE_KEY = "rasuah-vote-selection-v1";
 
+const loadStoredSelections = (): Record<string, VoteChoice | null> => {
+  if (typeof window === "undefined") return {};
+  try {
+    const saved = window.localStorage.getItem(STORAGE_KEY);
+    return saved ? JSON.parse(saved) : {};
+  } catch {
+    return {};
+  }
+};
+
 export function LedgerFeed({ locale = "ms" }: LedgerFeedProps) {
   const [filter, setFilter] = useState("ALL");
   const [sort, setSort] = useState("latest");
-  const [selectionMap, setSelectionMap] = useState<Record<string, VoteChoice | null>>({});
+  const [selectionMap, setSelectionMap] = useState<Record<string, VoteChoice | null>>(loadStoredSelections);
   const [voteStatsMap, setVoteStatsMap] = useState<Record<string, VoteStats>>({});
 
   useEffect(() => {
-    if (typeof window === "undefined") return;
-
-    try {
-      const saved = window.localStorage.getItem(STORAGE_KEY);
-      if (saved) {
-        setSelectionMap(JSON.parse(saved));
-      }
-    } catch {
-      // ignore invalid local storage content
-    }
-  }, []);
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(selectionMap));
   }, [selectionMap]);
 
@@ -73,14 +69,21 @@ export function LedgerFeed({ locale = "ms" }: LedgerFeedProps) {
   });
 
   useEffect(() => {
-    if (!data) return;
+    if (!data || data.length === 0) return;
 
+    // This is intentional - we need to update voteStatsMap when query data changes
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setVoteStatsMap((current) => {
       const next = { ...current };
+      let hasChanges = false;
       data.forEach((report: ApiReport) => {
-        next[report.id] = report.voteStats ?? { agree: 0, disagree: 0 };
+        const newStats = report.voteStats ?? { agree: 0, disagree: 0 };
+        if (JSON.stringify(next[report.id]) !== JSON.stringify(newStats)) {
+          next[report.id] = newStats;
+          hasChanges = true;
+        }
       });
-      return next;
+      return hasChanges ? next : current;
     });
   }, [data]);
 
