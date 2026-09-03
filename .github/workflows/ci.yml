@@ -2,10 +2,13 @@ name: CI
 
 on:
   push:
+    branches: [main]
   pull_request:
+    branches: [main]
 
 jobs:
-  build:
+  build-and-test:
+    name: Lint, typecheck, build
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -17,14 +20,23 @@ jobs:
         run: npm ci
       - name: Generate Prisma client
         run: npx prisma generate
+      - name: Check required environment variables
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
+        run: |
+          node -e "const required=['DATABASE_URL','GEMINI_API_KEY','ADMIN_PASSWORD']; const missing=required.filter(k=>!process.env[k]||process.env[k]===''); if(missing.length){console.error('Missing required env vars:',missing.join(', ')); process.exit(1);}"
       - name: Lint
         run: npm run lint
       - name: Typecheck
         run: npx tsc --noEmit
+      - name: Build
+        run: npm run build
 
   migrate-production:
     name: Apply production database migrations
-    needs: build
+    needs: build-and-test
     if: github.event_name == 'push' && github.ref == 'refs/heads/main' && secrets.POSTGRES_URL_NON_POOLING != ''
     runs-on: ubuntu-latest
     environment: production

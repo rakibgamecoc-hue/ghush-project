@@ -20,7 +20,7 @@ export default function Home() {
   return (
     <>
       <SiteHeader language={language} setLanguage={setLanguage} />
-      <main id="top" className="mx-auto max-w-6xl px-4 py-12 space-y-16">
+      <main id="top" aria-label="Main content" className="mx-auto max-w-6xl px-4 py-12 space-y-16">
         <section className="mx-auto max-w-3xl space-y-6 pt-10 text-center">
           <h1 className="text-5xl font-black leading-tight tracking-tight text-slate-900">
             {t.hero.headline}

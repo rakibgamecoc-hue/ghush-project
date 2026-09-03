@@ -13,6 +13,7 @@ declare module "@prisma/client" {
     verificationStatus?: string;
     agreeVotes: number;
     disagreeVotes: number;
+    reviewStatus: "PENDING" | "APPROVED" | "REJECTED";
     createdAt: string | Date;
   };
 
@@ -21,7 +22,11 @@ declare module "@prisma/client" {
     bribeReport: {
       create: (...args: any[]) => Promise<any>;
       findUnique: (...args: any[]) => Promise<any>;
+      findFirst: (...args: any[]) => Promise<any>;
       update: (...args: any[]) => Promise<any>;
+      updateMany: (...args: any[]) => Promise<any>;
+      delete: (...args: any[]) => Promise<any>;
+      deleteMany: (...args: any[]) => Promise<any>;
       findMany: (...args: any[]) => Promise<any[]>;
       aggregate: (...args: any[]) => Promise<any>;
       count: (...args: any[]) => Promise<number>;

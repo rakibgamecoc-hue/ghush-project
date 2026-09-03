@@ -44,10 +44,11 @@ export async function POST(req: Request) {
         amountDemanded: parsedAmount,
         outcome,
         narrativeText: sanitizedNarrative,
+        reviewStatus: "PENDING",
       },
     });
 
-    return NextResponse.json({ success: true, reportId: report.id }, { status: 201 });
+    return NextResponse.json({ success: true, reportId: report.id, status: "pending" }, { status: 201 });
   } catch (error) {
     console.error("Failed to create report:", error instanceof Error ? error.message : String(error));
     return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
@@ -60,7 +61,7 @@ export async function GET(req: Request) {
     const outcomeFilter = searchParams.get("outcome");
     const sort = searchParams.get("sort") || "latest";
 
-    const whereClause: Record<string, unknown> = {};
+    const whereClause: Record<string, unknown> = { reviewStatus: "APPROVED" };
     if (outcomeFilter && outcomeFilter !== "ALL") {
       whereClause.outcome = outcomeFilter;
     }

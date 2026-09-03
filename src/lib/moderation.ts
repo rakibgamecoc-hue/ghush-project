@@ -46,15 +46,37 @@ async function checkToxicityAndSpam(text: string): Promise<boolean> {
   }
 }
 
+export type UsefulnessAssessment = {
+  score: number;
+  reason: string;
+};
+
+export async function assessUsefulness(text: string): Promise<UsefulnessAssessment | null> {
+  if (!process.env.GEMINI_API_KEY) return null;
+  if (!text || text.trim().length === 0) return null;
+  try {
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+    const prompt = `Rate this corruption report from 0-10 for usefulness. 0 = gibberish, spam, or completely off-topic. 10 = specific, credible, actionable detail about a bribery demand. Return ONLY JSON: { "score": <0-10>, "reason": "<one sentence>" }\n\nText: ${text}`;
+    const result = await model.generateContent(prompt);
+    const raw = result.response.text().trim();
+    const match = raw.match(/\{[\s\S]*\}/);
+    const jsonText = match ? match[0] : raw;
+    const parsed = JSON.parse(jsonText) as { score?: number; reason?: string };
+    const score = typeof parsed.score === "number" ? Math.max(0, Math.min(10, parsed.score)) : 0;
+    const reason = typeof parsed.reason === "string" ? parsed.reason : "no reason provided";
+    return { score, reason };
+  } catch (error) {
+    console.error("Usefulness check failed:", error);
+    return null;
+  }
+}
+
 export async function sanitizeSubmission(rawNarrative: string): Promise<string | null> {
   // Step 1: Regex Redaction for Malaysian context (phones, ICs, plates)
   let cleanText = rawNarrative
-    // Phone numbers (e.g. 0123456789, +60123456789) — conservative
     .replace(/(?:\+?60|0)[1-9]\d{7,9}/g, "[PHONE REDACTED]")
-    // MyKad IC Numbers (e.g. 990101-14-1234 or 990101141234)
     .replace(/\b\d{6}-\d{2}-\d{4}\b/g, "[IC REDACTED]")
     .replace(/\b\d{12}\b/g, "[IC REDACTED]")
-    // Vehicle Plates: restrict to common plate shapes (letters+digits combinations)
     .replace(/\b[A-Z]{1,3}\s*\d{1,4}\s*[A-Z]{0,1}\b/gi, "[PLATE REDACTED]");
 
   // Step 2: Named Entity Recognition (LLM or fallback)
@@ -63,6 +85,13 @@ export async function sanitizeSubmission(rawNarrative: string): Promise<string |
   // Step 3: Toxicity & Hate Speech Check
   const isViolating = await checkToxicityAndSpam(cleanText);
   if (isViolating) return null;
+
+  // Step 4: Usefulness / Quality Gate
+  const assessment = await assessUsefulness(cleanText);
+  if (assessment && assessment.score < 4) {
+    console.warn("Submission blocked by usefulness filter:", assessment.reason);
+    return null;
+  }
 
   return cleanText;
 }

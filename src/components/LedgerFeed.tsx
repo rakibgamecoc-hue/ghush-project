@@ -1,10 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ThumbsDown, ThumbsUp } from "lucide-react";
+import { Link2, Share2, ThumbsDown, ThumbsUp } from "lucide-react";
 import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { translations, type SupportedLanguage } from "@/lib/translations";
@@ -74,6 +74,145 @@ const loadStoredVoteState = (): StoredVoteState => {
     return { selections: {}, stats: {}, pending: {} };
   }
 };
+
+type ShareMenuProps = {
+  reportId: string;
+  headline: string;
+};
+
+const SHARE_TEXT_PREFIX = "Reported on Rasuah: ";
+
+function ShareMenu({ reportId, headline }: ShareMenuProps) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [copyState, setCopyState] = useState<"idle" | "copied" | "error">("idle");
+  const menuRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const onClick = (event: MouseEvent) => {
+      if (!menuRef.current || menuRef.current.contains(event.target as Node)) return;
+      setIsOpen(false);
+    };
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setIsOpen(false);
+    };
+    document.addEventListener("mousedown", onClick);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onClick);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [isOpen]);
+
+  const buildShareUrl = useCallback(() => {
+    if (typeof window === "undefined") return "";
+    return `${window.location.origin}/#report-${reportId}`;
+  }, [reportId]);
+
+  const buildShareText = useCallback(() => {
+    return `${SHARE_TEXT_PREFIX}${headline}`;
+  }, [headline]);
+
+  const handleNativeShare = useCallback(async () => {
+    if (typeof navigator === "undefined" || typeof navigator.share !== "function") {
+      setIsOpen(true);
+      return;
+    }
+    try {
+      await navigator.share({ title: "Rasuah Report", text: buildShareText(), url: buildShareUrl() });
+      setIsOpen(false);
+    } catch (err) {
+      if (err instanceof DOMException && err.name === "AbortError") return;
+      setIsOpen(true);
+    }
+  }, [buildShareText, buildShareUrl]);
+
+  const handleCopy = useCallback(async () => {
+    const url = buildShareUrl();
+    if (!url) {
+      setCopyState("error");
+      return;
+    }
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(url);
+      } else {
+        const textarea = document.createElement("textarea");
+        textarea.value = url;
+        textarea.style.position = "fixed";
+        textarea.style.opacity = "0";
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand("copy");
+        document.body.removeChild(textarea);
+      }
+      setCopyState("copied");
+      window.setTimeout(() => setCopyState("idle"), 1800);
+    } catch {
+      setCopyState("error");
+      window.setTimeout(() => setCopyState("idle"), 1800);
+    }
+  }, [buildShareUrl]);
+
+  const tweetHref = `https://twitter.com/intent/tweet?text=${encodeURIComponent(buildShareText())}&url=${encodeURIComponent(buildShareUrl())}`;
+  const fbHref = `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(buildShareUrl())}`;
+
+  return (
+    <div className="relative" ref={menuRef}>
+      <button
+        type="button"
+        onClick={handleNativeShare}
+        onContextMenu={(e) => {
+          e.preventDefault();
+          setIsOpen((current) => !current);
+        }}
+        aria-haspopup="menu"
+        aria-expanded={isOpen}
+        aria-label="Share this report"
+        className="inline-flex h-8 w-8 items-center justify-center rounded-none border-2 border-slate-900 bg-white text-slate-900 transition hover:bg-slate-100"
+      >
+        <Share2 className="h-4 w-4" />
+      </button>
+      {isOpen && (
+        <div
+          role="menu"
+          aria-label="Share options"
+          className="menu-pop-in absolute right-0 z-10 mt-2 flex w-44 flex-col rounded-2xl border-2 border-slate-900 bg-white p-2 shadow-[6px_6px_0_rgba(15,23,42,0.9)]"
+        >
+          <a
+            role="menuitem"
+            href={tweetHref}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={() => setIsOpen(false)}
+            className="rounded-xl px-3 py-2 text-left text-sm font-medium text-slate-700 transition hover:bg-slate-100"
+          >
+            Share on X / Twitter
+          </a>
+          <a
+            role="menuitem"
+            href={fbHref}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={() => setIsOpen(false)}
+            className="rounded-xl px-3 py-2 text-left text-sm font-medium text-slate-700 transition hover:bg-slate-100"
+          >
+            Share on Facebook
+          </a>
+          <button
+            type="button"
+            role="menuitem"
+            onClick={handleCopy}
+            className="inline-flex items-center gap-2 rounded-xl px-3 py-2 text-left text-sm font-medium text-slate-700 transition hover:bg-slate-100"
+          >
+            <Link2 className="h-3.5 w-3.5" />
+            {copyState === "copied" ? "Link copied" : copyState === "error" ? "Copy failed" : "Copy link"}
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
 
 export function LedgerFeed({ locale = "ms" }: LedgerFeedProps) {
   const [filter, setFilter] = useState("ALL");
@@ -271,9 +410,9 @@ export function LedgerFeed({ locale = "ms" }: LedgerFeedProps) {
             const selectedChoice = selectionMap[report.id] ?? null;
 
             return (
-              <Card key={report.id} className="rounded-none border-2 border-slate-900 bg-white shadow-[4px_4px_0_rgba(15,23,42,0.9)] transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[6px_6px_0_rgba(15,23,42,0.9)]">
+              <article key={report.id} className="rounded-none border-2 border-slate-900 bg-white shadow-[4px_4px_0_rgba(15,23,42,0.9)] transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[6px_6px_0_rgba(15,23,42,0.9)]">
                 <CardHeader className="flex flex-row items-start justify-between space-y-0 pb-2">
-                  <div>
+                  <div className="flex-1 pr-3">
                     <Badge variant="outline" className="mb-2 border-yellow-300 bg-yellow-100 text-yellow-800">
                       {t.unverified}
                     </Badge>
@@ -284,19 +423,25 @@ export function LedgerFeed({ locale = "ms" }: LedgerFeedProps) {
                       {report.districtLocation}, {report.stateRegion}
                     </p>
                   </div>
-                  <div className="text-right">
-                    <span className="block text-xl font-black text-slate-900">RM {report.amountDemanded}</span>
-                    <Badge
-                      className={
-                        report.outcome === "PAID"
-                          ? "bg-red-500"
-                          : report.outcome === "REJECTED"
-                            ? "bg-green-500"
-                            : "bg-slate-500"
-                      }
-                    >
-                      {report.outcome}
-                    </Badge>
+                  <div className="flex flex-col items-end gap-2">
+                    <div className="text-right">
+                      <span className="block text-xl font-black text-slate-900">RM {report.amountDemanded}</span>
+                      <Badge
+                        className={
+                          report.outcome === "PAID"
+                            ? "bg-red-500"
+                            : report.outcome === "REJECTED"
+                              ? "bg-green-500"
+                              : "bg-slate-500"
+                        }
+                      >
+                        {report.outcome}
+                      </Badge>
+                    </div>
+                    <ShareMenu
+                      reportId={report.id}
+                      headline={`${report.departmentCategory} - ${report.serviceType} (RM ${report.amountDemanded})`}
+                    />
                   </div>
                 </CardHeader>
                 <CardContent>
@@ -343,7 +488,7 @@ export function LedgerFeed({ locale = "ms" }: LedgerFeedProps) {
                     </div>
                   </div>
                 </CardContent>
-              </Card>
+              </article>
             );
           })}
           {data?.length === 0 && <div className="col-span-full py-12 text-center text-slate-500">{t.noReports}</div>}
