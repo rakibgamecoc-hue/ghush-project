@@ -35,7 +35,7 @@ type LedgerFeedProps = {
 
 const STORAGE_KEY = "rasuah-vote-selection-v1";
 const VOTE_STATE_KEY = "rasuah-vote-state-v2";
-const VOTE_DEBOUNCE_MS = 750;
+const VOTE_DEBOUNCE_MS = 300;
 
 type StoredVoteState = {
   selections: Record<string, VoteChoice | null>;
@@ -46,6 +46,7 @@ type StoredVoteState = {
 type PendingVote = {
   choice: VoteChoice;
   previousChoice: VoteChoice | null;
+  retryCount: number;
 };
 
 const loadStoredVoteState = (): StoredVoteState => {
@@ -57,12 +58,12 @@ const loadStoredVoteState = (): StoredVoteState => {
         selections: parsed.selections ?? {},
         stats: parsed.stats ?? {},
         pending: Object.fromEntries(
-          Object.entries(parsed.pending ?? {}).map(([reportId, pending]) => [
-            reportId,
-            typeof pending === "string"
-              ? { choice: pending as VoteChoice, previousChoice: null }
-              : pending as PendingVote,
-          ]),
+          Object.entries(parsed.pending ?? {}).map(([reportId, pending]) => {
+            const normalized = typeof pending === "string"
+              ? { choice: pending as VoteChoice, previousChoice: null, retryCount: 0 }
+              : { ...pending as PendingVote, retryCount: (pending as PendingVote).retryCount ?? 0 };
+            return [reportId, normalized];
+          }),
         ),
       };
     }
@@ -230,10 +231,7 @@ export function LedgerFeed({ locale = "ms" }: LedgerFeedProps) {
   useEffect(() => {
     const stored = loadStoredVoteState();
     selectionMapRef.current = stored.selections;
-    serverSelectionRef.current = { ...stored.selections };
-    Object.entries(stored.pending).forEach(([reportId, pending]) => {
-      serverSelectionRef.current[reportId] = pending.previousChoice;
-    });
+    serverSelectionRef.current = {};
     voteStatsMapRef.current = stored.stats;
     const timer = window.setTimeout(() => {
       setSelectionMap(stored.selections);
@@ -266,14 +264,12 @@ export function LedgerFeed({ locale = "ms" }: LedgerFeedProps) {
   useEffect(() => {
     if (!data || data.length === 0) return;
 
-    // This is intentional - we need to update voteStatsMap when query data changes
     setVoteStatsMap((current) => {
       const next = { ...current };
       let hasChanges = false;
       data.forEach((report: ApiReport) => {
         const newStats = report.voteStats ?? { agree: 0, disagree: 0 };
-        // A local optimistic value survives a slow or failed production refresh.
-        if (!next[report.id]) {
+        if (!next[report.id] || !pendingVotes[report.id]) {
           next[report.id] = newStats;
           hasChanges = true;
         }
@@ -281,7 +277,7 @@ export function LedgerFeed({ locale = "ms" }: LedgerFeedProps) {
       voteStatsMapRef.current = hasChanges ? next : current;
       return hasChanges ? next : current;
     });
-  }, [data]);
+  }, [data, pendingVotes]);
 
   const t = translations[locale].ledger;
   const dateLocaleMap: Record<SupportedLanguage, string> = {
@@ -299,8 +295,7 @@ export function LedgerFeed({ locale = "ms" }: LedgerFeedProps) {
     PENDING: t.pending,
   };
 
-  const sendVote = useCallback(async (reportId: string, choice: VoteChoice) => {
-    const previousChoice = serverSelectionRef.current[reportId] ?? null;
+  const sendVote = useCallback(async (reportId: string, choice: VoteChoice, previousChoice: VoteChoice | null) => {
     try {
       const res = await fetch("/api/reports/vote", {
         method: "POST",
@@ -323,21 +318,39 @@ export function LedgerFeed({ locale = "ms" }: LedgerFeedProps) {
         voteStatsMapRef.current = next;
         setVoteStatsMap(next);
       }
-      void queryClient.invalidateQueries({ queryKey: ["reports"] });
+      queryClient.setQueryData<ApiReport[]>(["reports", filter, sort], (old) => {
+        if (!old) return old;
+        return old.map((report) =>
+          report.id === reportId && json.voteStats
+            ? { ...report, voteStats: json.voteStats as VoteStats }
+            : report
+        );
+      });
     } catch (error) {
-      // Keep the local choice and count. It will retry on the user's next vote or page load.
       console.error("Failed to store vote:", error);
+      setPendingVotes((current) => {
+        const pending = current[reportId];
+        if (!pending) return current;
+        return {
+          ...current,
+          [reportId]: { ...pending, retryCount: (pending.retryCount ?? 0) + 1 },
+        };
+      });
     }
-  }, [queryClient]);
+  }, [queryClient, filter, sort]);
 
   const queueVote = useCallback((reportId: string, vote: PendingVote) => {
     const existingTimer = voteTimersRef.current.get(reportId);
     if (existingTimer) window.clearTimeout(existingTimer);
 
+    const retryCount = vote.retryCount ?? 0;
+    const backoffMs = Math.min(1000 * Math.pow(2, retryCount), 30000);
+    const delay = retryCount === 0 ? VOTE_DEBOUNCE_MS : backoffMs;
+
     const timer = window.setTimeout(() => {
       voteTimersRef.current.delete(reportId);
-      void sendVote(reportId, vote.choice);
-    }, VOTE_DEBOUNCE_MS);
+      void sendVote(reportId, vote.choice, vote.previousChoice);
+    }, delay);
     voteTimersRef.current.set(reportId, timer);
   }, [sendVote]);
 
@@ -368,7 +381,8 @@ export function LedgerFeed({ locale = "ms" }: LedgerFeedProps) {
     setVoteStatsMap(nextStatsMap);
     const queuedVote = {
       choice,
-      previousChoice: pendingVotes[reportId]?.previousChoice ?? serverSelectionRef.current[reportId] ?? null,
+      previousChoice,
+      retryCount: 0,
     };
     setPendingVotes((current) => ({ ...current, [reportId]: queuedVote }));
     queueVote(reportId, queuedVote);
@@ -398,20 +412,20 @@ export function LedgerFeed({ locale = "ms" }: LedgerFeedProps) {
       </div>
 
       {isLoading ? (
-        <div className="grid gap-4 md:grid-cols-2">
+        <div className="grid gap-6 md:grid-cols-2">
           {[1, 2, 3, 4].map((i) => (
             <div key={i} className="h-48 animate-pulse border border-slate-200 bg-slate-100" />
           ))}
         </div>
       ) : (
-        <div className="grid gap-4 md:grid-cols-2">
+        <div className="grid gap-6 md:grid-cols-2">
           {data?.map((report: ApiReport) => {
             const stats = voteStatsMap[report.id] ?? report.voteStats ?? { agree: 0, disagree: 0 };
             const selectedChoice = selectionMap[report.id] ?? null;
 
             return (
-              <article key={report.id} className="rounded-none border-2 border-slate-900 bg-white shadow-[4px_4px_0_rgba(15,23,42,0.9)] transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[6px_6px_0_rgba(15,23,42,0.9)]">
-                <CardHeader className="flex flex-row items-start justify-between space-y-0 pb-2">
+              <article key={report.id} className="flex h-full min-w-0 flex-col rounded-none border-2 border-slate-900 bg-white shadow-[4px_4px_0_rgba(15,23,42,0.9)] transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[6px_6px_0_rgba(15,23,42,0.9)]">
+                <CardHeader className="flex flex-row items-start justify-between space-y-0 pb-3">
                   <div className="flex-1 pr-3">
                     <Badge variant="outline" className="mb-2 border-yellow-300 bg-yellow-100 text-yellow-800">
                       {t.unverified}
@@ -444,7 +458,7 @@ export function LedgerFeed({ locale = "ms" }: LedgerFeedProps) {
                     />
                   </div>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="flex-1 py-4">
                   <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-slate-700">{report.narrativeText}</p>
                   <p className="mt-4 text-xs text-slate-400">
                     {t.reportedOn} {new Date(report.createdAt).toLocaleDateString(dateLocaleMap[locale])}

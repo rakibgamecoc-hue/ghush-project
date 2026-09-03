@@ -1,7 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ChevronDown, Globe, Menu, X } from "lucide-react";
+import { ChevronDown, Globe, Lock, Menu, X } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { LANGUAGE_OPTIONS, type SupportedLanguage, translations } from "@/lib/translations";
 
 const NAV_ITEMS = [
@@ -17,6 +18,7 @@ type SiteHeaderProps = {
 };
 
 export function SiteHeader({ language, setLanguage }: SiteHeaderProps) {
+  const router = useRouter();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isLanguageMenuOpen, setIsLanguageMenuOpen] = useState(false);
   const [isQuickJumpOpen, setIsQuickJumpOpen] = useState(false);
@@ -166,6 +168,15 @@ export function SiteHeader({ language, setLanguage }: SiteHeaderProps) {
                     {t.nav[item.key as keyof typeof t.nav]}
                   </button>
                 ))}
+                <button
+                  type="button"
+                  onClick={() => router.push("/admin/login")}
+                  className="inline-flex items-center gap-1.5 rounded-full px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100 hover:text-slate-900"
+                  aria-label="Admin login"
+                >
+                  <Lock className="h-3.5 w-3.5" />
+                  <span>Admin</span>
+                </button>
               </nav>
 
               <div className="hidden items-center gap-2 md:flex">
@@ -191,6 +202,13 @@ export function SiteHeader({ language, setLanguage }: SiteHeaderProps) {
                           {t.nav[item.key as keyof typeof t.nav]}
                         </button>
                       ))}
+                      <button
+                        type="button"
+                        onClick={() => router.push("/admin/login")}
+                        className="rounded-xl px-3 py-2 text-left text-sm font-medium text-slate-700 transition hover:bg-slate-100 hover:text-slate-900"
+                      >
+                        Admin
+                      </button>
                     </div>
                   )}
                 </div>
@@ -265,6 +283,13 @@ export function SiteHeader({ language, setLanguage }: SiteHeaderProps) {
                       {t.nav[item.key as keyof typeof t.nav]}
                     </button>
                   ))}
+                  <button
+                    type="button"
+                    onClick={() => router.push("/admin/login")}
+                    className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-left text-sm font-semibold text-slate-700 transition-colors duration-200 hover:bg-slate-100"
+                  >
+                    Admin
+                  </button>
                 </div>
 
                 <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 shadow-[0_4px_0_rgba(15,23,42,0.08)]">
