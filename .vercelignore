@@ -1,0 +1,7 @@
+.kilo
+.kilo/**
+.kilo/*
+node_modules
+.next
+dist
+build
